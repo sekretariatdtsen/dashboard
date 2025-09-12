@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DTSEN Dashboard - Monitoring</title>
+
+  <!-- CSS (Bootstrap, FontAwesome, AdminLTE) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/css/adminlte.min.css">
+  <style>
+    /* kecil2 custom */
+    .chart-card { height: 320px; }
+    .small-box .inner { font-size: 1.1rem; }
+  </style>
+</head>
+<body class="hold-transition sidebar-mini">
+<div class="wrapper">
+  <!-- Navbar -->
+  <nav class="main-header navbar navbar-expand navbar-white navbar-light">
+    <span class="navbar-brand">DTSEN Monitoring</span>
+  </nav>
+
+  <!-- Sidebar (minimal) -->
+  <aside class="main-sidebar sidebar-dark-primary elevation-4">
+    <a href="#" class="brand-link">
+      <span class="brand-text font-weight-light">Dashboard</span>
+    </a>
+    <div class="sidebar">
+      <nav class="mt-2">
+        <ul class="nav nav-pills nav-sidebar flex-column">
+          <li class="nav-item"><a class="nav-link active"><i class="nav-icon fas fa-tachometer-alt"></i><p>Overview</p></a></li>
+        </ul>
+      </nav>
+    </div>
+  </aside>
+
+  <!-- Content wrapper -->
+  <div class="content-wrapper">
+    <section class="content p-3">
+      <div class="container-fluid">
+        <!-- small boxes -->
+        <div class="row">
+          <div class="col-lg-3 col-6">
+            <div class="small-box bg-info">
+              <div class="inner"><h3 id="totalSurat">0</h3><p>Total Surat</p></div>
+              <div class="icon"><i class="fas fa-envelope"></i></div>
+            </div>
+          </div>
+          <div class="col-lg-3 col-6">
+            <div class="small-box bg-warning">
+              <div class="inner"><h3 id="suratProses">0</h3><p>Sedang Proses</p></div>
+              <div class="icon"><i class="fas fa-spinner"></i></div>
+            </div>
+          </div>
+          <div class="col-lg-3 col-6">
+            <div class="small-box bg-success">
+              <div class="inner"><h3 id="suratSelesai">0</h3><p>Selesai / BAST</p></div>
+              <div class="icon"><i class="fas fa-check-circle"></i></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- chart + table -->
+        <div class="row">
+          <div class="col-lg-6">
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">Distribusi Surat per Tahap</h3></div>
+              <div class="card-body chart-card">
+                <canvas id="chartTahap" style="height:100%"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-lg-6">
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">Daftar Surat Terbaru</h3></div>
+              <div class="card-body table-responsive p-0" style="max-height:400px;">
+                <table class="table table-hover text-nowrap" id="surat-table">
+                  <thead><tr><th>NoSurat</th><th>Instansi</th><th>Tahap</th><th>TanggalUpdate</th><th>Dokumen</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </div>
+
+  <footer class="main-footer text-center"><strong>DTSEN Monitoring</strong></footer>
+</div>
+
+<!-- JS libs -->
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/admin-lte@3.2/dist/js/adminlte.min.js"></script>
+
+<script>
+  // === CONFIG: ganti SHEET_ID & SHEET_NAME ===
+  const SHEET_ID = 'REPLACE_SHEET_ID';
+  const SHEET_NAME = 'Sheet1'; // ganti kalau beda
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${SHEET_NAME}`;
+
+  function safeCell(cell) {
+    return (cell && ('v' in cell)) ? cell.v : '';
+  }
+
+  fetch(url)
+    .then(res => res.text())
+    .then(txt => {
+      // Google gviz returns non-pure JSON => perlu strip
+      const json = JSON.parse(txt.substring(47).slice(0, -2));
+      const cols = json.table.cols.map(c => c.label || '');
+      const rows = json.table.rows.map(r => r.c.map(c => safeCell(c)));
+
+      // cari index kolom berdasarkan header
+      const idx = (name) => cols.indexOf(name);
+      const iNo = idx('NoSurat'), iInst = idx('Instansi'), iTahap = idx('Tahap'),
+            iTgl = idx('TanggalUpdate'), iLink = idx('LinkFile');
+
+      // isi tabel
+      const tbody = document.querySelector('#surat-table tbody');
+      rows.slice().reverse().forEach(r => { // reverse = newest on top (as contoh)
+        const no = r[iNo] || '';
+        const inst = r[iInst] || '';
+        const tahap = r[iTahap] || '';
+        const tgl = r[iTgl] || '';
+        const link = r[iLink] || '';
+        const linkHtml = link ? `<a href="${link}" target="_blank">Lihat</a>` : '';
+        tbody.insertAdjacentHTML('beforeend',
+          `<tr><td>${no}</td><td>${inst}</td><td>${tahap}</td><td>${tgl}</td><td>${linkHtml}</td></tr>`);
+      });
+
+      // hitung distribusi per tahap
+      const counts = {};
+      rows.forEach(r => {
+        const tahap = (r[iTahap] || 'Unknown').toString();
+        counts[tahap] = (counts[tahap] || 0) + 1;
+      });
+      const labels = Object.keys(counts);
+      const data = labels.map(l => counts[l]);
+
+      // membuat chart
+      const ctx = document.getElementById('chartTahap').getContext('2d');
+      new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Jumlah Surat', data }] },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      // update small boxes
+      const total = rows.length;
+      let selesai = 0, proses = 0;
+      rows.forEach(r => {
+        const t = (r[iTahap] || '').toString().toLowerCase();
+        if (t.includes('selesai') || t.includes('bast') || t.includes('terkirim')) selesai++;
+        else proses++;
+      });
+      document.getElementById('totalSurat').innerText = total;
+      document.getElementById('suratProses').innerText = proses;
+      document.getElementById('suratSelesai').innerText = selesai;
+
+    })
+    .catch(err => {
+      console.error('Error loading sheet:', err);
+      alert('Gagal load Google Sheet. Cek SHEET_ID, apakah sudah Publish to web / permission.');
+    });
+</script>
+</body>
+</html>
