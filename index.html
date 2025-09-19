@@ -155,6 +155,9 @@ fetch(SHEET_URL)
     const json = JSON.parse(txt.substr(47).slice(0,-2)); // parse gviz json
     const rows = json.table.rows;
 
+    // 👉 mulai dari baris ke-13 (indeks 12, karena array dimulai dari 0)
+    const dataRows = rows.slice(12);
+    
     let totalSurat = rows.length;
     let totalBAST = 0;
     let lembagaSet = new Set();
@@ -163,10 +166,10 @@ fetch(SHEET_URL)
     tbody.innerHTML = "";
 
     rows.forEach(r => {
-      let lembaga = r.c[0] ? r.c[0].v : "";
       let noSurat = r.c[1] ? r.c[1].v : "";
-      let tgl = r.c[2] ? r.c[2].f || r.c[2].v : "";
-      let status = r.c[3] ? r.c[3].v : "";
+      let tgl = r.c[3] ? r.c[3].f || r.c[3].v : "";
+      let lembaga = r.c[2] ? r.c[2].v : "";
+      let status = r.c[9] ? r.c[9].v : "";
 
       // Hitung BAST Selesai
       if (status && status.toLowerCase().includes("bast")) {
