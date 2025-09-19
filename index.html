@@ -21,7 +21,7 @@
         <a class="nav-link" data-widget="pushmenu" href="#"><i class="fas fa-bars"></i></a>
       </li>
       <li class="nav-item d-none d-sm-inline-block">
-        <a href="#" class="nav-link">DTSEN Dashboard</a>
+        <a href="#" class="nav-link">Dashboard DTSEN</a>
       </li>
     </ul>
   </nav>
@@ -158,14 +158,14 @@ fetch(SHEET_URL)
     // 👉 mulai dari baris ke-13 (indeks 12, karena array dimulai dari 0)
     const dataRows = rows.slice(12);
     
-    let totalSurat = rows.length;
+    let totalSurat = dataRows.length;
     let totalBAST = 0;
     let lembagaSet = new Set();
 
     let tbody = document.querySelector("#tabelSurat tbody");
     tbody.innerHTML = "";
 
-    rows.forEach(r => {
+    dataRows.forEach(r => {
       let noSurat = r.c[1] ? r.c[1].v : "";
       let tgl = r.c[3] ? r.c[3].f || r.c[3].v : "";
       let lembaga = r.c[2] ? r.c[2].v : "";
@@ -180,8 +180,8 @@ fetch(SHEET_URL)
 
       // Tambah ke tabel
       let tr = `<tr>
-        <td>${lembaga}</td>
         <td>${noSurat}</td>
+        <td>${lembaga}</td>
         <td>${tgl}</td>
         <td>${status}</td>
       </tr>`;
