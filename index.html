@@ -181,8 +181,8 @@ fetch(SHEET_URL)
     const json = JSON.parse(txt.substr(47).slice(0, -2)); // parse gviz json
     const rows = json.table.rows;
 
-    // 👉 mulai dari baris ke-10 sheet (karena rows[] hanya isi yg ada data)
-    const dataRows = rows.slice(9);
+    // 👉 mulai dari baris ke-x+1 sheet (karena rows[] hanya isi yg ada data)
+    const dataRows = rows.slice(6);
 
     let totalSurat = 0;   // dihitung dari kolom Tanggal
     let totalBAST = 0;    // jumlah yg status = v
@@ -198,13 +198,13 @@ fetch(SHEET_URL)
       let tgl = normalizeDate(tglRaw);
       let lembaga = r.c[2] ? r.c[2].v : "";
       let statusRaw = r.c[9] ? r.c[9].v : "";
-      let status = statusRaw === "v" ? "✔️" : "–";
+      let status = statusRaw === "v" ? "OK" : "–";
 
       // Hitung jumlah surat berdasarkan tanggal ada isinya
-      if (tgl) totalSurat++;
+      if (lembaga) totalSurat++;
 
       // Hitung BAST Selesai / On Progress
-      if (statusRaw === "v") {
+      if (statusRaw === "OK") {
         totalBAST++;
       } else {
         onProgress++;
