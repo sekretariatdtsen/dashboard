@@ -155,8 +155,8 @@ fetch(SHEET_URL)
     const json = JSON.parse(txt.substr(47).slice(0,-2)); // parse gviz json
     const rows = json.table.rows;
 
-    // 👉 mulai dari baris ke-13 (indeks 12, karena array dimulai dari 0)
-    const dataRows = rows.slice(12);
+    // 👉 mulai dari baris ke-13 (baris ke 6, karena array dimulai dari 0 dan hanya dihitung baris yg ada isian)
+    const dataRows = rows.slice(6);
     
     let totalSurat = dataRows.length;
     let totalBAST = 0;
