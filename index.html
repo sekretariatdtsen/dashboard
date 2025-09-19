@@ -122,10 +122,10 @@
         <table class="table table-bordered" id="tabelSurat">
           <thead>
             <tr>
-              <th>Lembaga</th>
-              <th>No Surat</th>
+              <th>No</th>
               <th>Tanggal</th>
-              <th>Status</th>
+              <th>Lembaga</th>
+              <th>BAST</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -149,17 +149,44 @@ const SHEET_ID = "1fpkO2nodFJNPp71C12LZLxsqsJ8rt9G-wRVSwwugwoc"; // ID sheet
 const SHEET_GID = "0"; // gid tab sheet
 const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}`;
 
+// Fungsi normalisasi tanggal (akomodir variasi nama bulan)
+function normalizeDate(str) {
+  if (!str) return "";
+  let mapBulan = {
+    jan: "Jan", januari: "Jan",
+    feb: "Feb", februari: "Feb",
+    mar: "Mar", maret: "Mar",
+    apr: "Apr", april: "Apr",
+    mei: "May", may: "May",
+    jun: "Jun", juni: "Jun",
+    jul: "Jul", juli: "Jul",
+    aug: "Aug", agust: "Aug", agustus: "Aug", agu: "Aug",
+    sep: "Sep", sept: "Sep", september: "Sep",
+    oct: "Oct", oktober: "Oct",
+    nov: "Nov", november: "Nov",
+    dec: "Dec", desember: "Dec"
+  };
+  let lower = str.toLowerCase();
+  for (let key in mapBulan) {
+    if (lower.includes(key)) {
+      return str.replace(new RegExp(key, "i"), mapBulan[key]);
+    }
+  }
+  return str;
+}
+
 fetch(SHEET_URL)
   .then(res => res.text())
   .then(txt => {
-    const json = JSON.parse(txt.substr(47).slice(0,-2)); // parse gviz json
+    const json = JSON.parse(txt.substr(47).slice(0, -2)); // parse gviz json
     const rows = json.table.rows;
 
-    // 👉 mulai dari baris ke-13 (baris ke 6, karena array dimulai dari 0 dan hanya dihitung baris yg ada isian)
-    const dataRows = rows.slice(6);
-    
-    let totalSurat = dataRows.length;
-    let totalBAST = 0;
+    // 👉 mulai dari baris ke-10 sheet (karena rows[] hanya isi yg ada data)
+    const dataRows = rows.slice(9);
+
+    let totalSurat = 0;   // dihitung dari kolom Tanggal
+    let totalBAST = 0;    // jumlah yg status = v
+    let onProgress = 0;   // jumlah yg status kosong
     let lembagaSet = new Set();
 
     let tbody = document.querySelector("#tabelSurat tbody");
@@ -167,14 +194,22 @@ fetch(SHEET_URL)
 
     dataRows.forEach(r => {
       let noSurat = r.c[1] ? r.c[1].v : "";
-      let tgl = r.c[3] ? r.c[3].f || r.c[3].v : "";
+      let tglRaw = r.c[3] ? r.c[3].f || r.c[3].v : "";
+      let tgl = normalizeDate(tglRaw);
       let lembaga = r.c[2] ? r.c[2].v : "";
-      let status = r.c[9] ? r.c[9].v : "";
+      let statusRaw = r.c[9] ? r.c[9].v : "";
+      let status = statusRaw === "v" ? "✔️" : "–";
 
-      // Hitung BAST Selesai
-      if (status && status.toLowerCase().includes("bast")) {
+      // Hitung jumlah surat berdasarkan tanggal ada isinya
+      if (tgl) totalSurat++;
+
+      // Hitung BAST Selesai / On Progress
+      if (statusRaw === "v") {
         totalBAST++;
+      } else {
+        onProgress++;
       }
+
       // Hitung lembaga unik
       if (lembaga) lembagaSet.add(lembaga);
 
@@ -188,9 +223,6 @@ fetch(SHEET_URL)
       tbody.innerHTML += tr;
     });
 
-    // Hitung On Progress = total surat - BAST
-    let onProgress = totalSurat - totalBAST;
-
     // Update Score Cards
     document.getElementById("totalLembaga").innerText = lembagaSet.size;
     document.getElementById("totalSurat").innerText = totalSurat;
@@ -199,6 +231,21 @@ fetch(SHEET_URL)
   })
   .catch(err => console.error("Error fetch sheet:", err));
 </script>
+
+<style>
+/* Styling tabel */
+#tabelSurat thead {
+  background-color: #007bff;
+  color: white;
+}
+#tabelSurat tbody tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+#tabelSurat tbody tr:nth-child(odd) {
+  background-color: #ffffff;
+}
+</style>
+
 
 </body>
 </html>
