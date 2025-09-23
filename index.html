@@ -147,14 +147,11 @@
   
 <!-- ======= SCRIPT & STYLE untuk fetch + parsing ======= -->
 <script>
-// === Konfigurasi Google Sheet ===
 const SHEET_ID = "1fpkO2nodFJNPp71C12LZLxsqsJ8rt9G-wRVSwwugwoc";
 const SHEET_GID = "0";
 const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}`;
+const START_ROW = null;
 
-const START_ROW = null; // auto-detect baris pertama
-
-// Map variasi nama bulan lokal ke English
 const MONTH_MAP = {
   'jan':'Jan','januari':'Jan',
   'feb':'Feb','februari':'Feb',
@@ -163,14 +160,13 @@ const MONTH_MAP = {
   'mei':'May','may':'May',
   'jun':'Jun','juni':'Jun',
   'jul':'Jul','juli':'Jul',
-  'aug':'Aug','agust':'Aug','agu':'Aug',
+  'aug':'Aug','agust':'Aug','Agust':'Aug','agu':'Aug',
   'sep':'Sep','sept':'Sep','september':'Sep',
   'okt':'Oct','oktober':'Oct','oct':'Oct',
   'nov':'Nov','november':'Nov',
   'dec':'Dec','desember':'Dec','dec':'Dec'
 };
 
-// Parsing tanggal sederhana tapi fleksibel
 function normalizeAndParseDate(raw){
   if(!raw && raw!==0) return null;
   let s = String(raw).trim().replace(/[-.,]/g,' ');
@@ -181,15 +177,13 @@ function normalizeAndParseDate(raw){
   let t = Date.parse(s);
   if(!isNaN(t)) return new Date(t);
 
-  // dd MMM yy / yyyy
   const m = s.match(/(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{2,4})/);
   if(m){
     const day = parseInt(m[1],10);
-    const monStr = m[2];
     let year = parseInt(m[3],10);
     if(year<100) year+=2000;
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    const monIndex = months.findIndex(x=>x.toLowerCase()===monStr.toLowerCase());
+    const monIndex = months.findIndex(x=>x.toLowerCase()===m[2].toLowerCase());
     if(monIndex>=0) return new Date(year,monIndex,day);
   }
   return null;
@@ -203,14 +197,13 @@ function formatDateShort(d){
 }
 
 function mapStatus(raw){
-  if(!raw || String(raw).trim()==="") return {display:"-",done:false};
+  if(!raw || String(raw).trim()==="") return {display:"-", done:false};
   const s = String(raw).trim().toLowerCase();
   const okSet = new Set(["v","✔","✓","ok","ya","yes","done","true","terkirim"]);
-  if(okSet.has(s) || s.includes("bast") || s.includes("selesai")) return {display:"OK",done:true};
-  return {display:String(raw),done:false};
+  if(okSet.has(s) || s.includes("bast") || s.includes("selesai")) return {display:"OK", done:true};
+  return {display:String(raw), done:false};
 }
 
-// helper safe-get
 const getCellValue = cell => {
   if(!cell) return "";
   return ('v' in cell && cell.v!=null)?cell.v:(cell.f||"");
@@ -226,8 +219,8 @@ fetch(SHEET_URL)
       if(START_ROW!==null) startIdx = START_ROW;
       else {
         for(let i=0;i<rows.length;i++){
-          const r = rows[i];
-          const no = getCellValue(r.c[0]);
+          const r=rows[i];
+          const no=getCellValue(r.c[0]);
           if(no.trim()!==""){startIdx=i;break;}
         }
       }
@@ -255,7 +248,7 @@ fetch(SHEET_URL)
         if(mapped.done) totalBAST++;
         if(lembagaRaw) lembagaSet.add(lembagaRaw.trim());
 
-        const tr = `<tr>
+        const tr=`<tr>
           <td>${noSurat}</td>
           <td>${tglDisplay}</td>
           <td>${lembagaRaw}</td>
