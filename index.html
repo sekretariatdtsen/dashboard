@@ -143,7 +143,7 @@
 
 </div>
 
-<!-- ======= SCRIPT & STYLE untuk fetch + parsing ======= -->
+  
 <!-- ======= SCRIPT & STYLE untuk fetch + parsing ======= -->
 <script>
 // === Konfigurasi Google Sheet ===
@@ -151,12 +151,9 @@ const SHEET_ID = "1fpkO2nodFJNPp71C12LZLxsqsJ8rt9G-wRVSwwugwoc";
 const SHEET_GID = "0";
 const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}`;
 
-// Jika mau paksa mulai dari baris ke-n (0-based pada array rows[]),
-// set START_ROW ke angka (misal 3 untuk mulai dari rows[3]).
-// Kalau null -> auto-detect baris pertama yang berisi kolom penting.
-const START_ROW = null; // contoh: 3  atau null (auto)
+const START_ROW = null; // null -> auto-detect baris pertama yang berisi data
 
-// Map variasi nama bulan ke format yg bisa diparse oleh Date
+// Map variasi nama bulan ke format English
 const MONTH_MAP = {
   'jan':'Jan','januari':'Jan',
   'feb':'Feb','februari':'Feb',
@@ -165,7 +162,7 @@ const MONTH_MAP = {
   'mei':'May','may':'May',
   'jun':'Jun','juni':'Jun',
   'jul':'Jul','juli':'Jul',
-  'aug':'Aug','agust':'Aug','Agust':'Aug','agu':'Aug',
+  'aug':'Aug','agust':'Aug','agu':'Aug',
   'sep':'Sep','sept':'Sep','september':'Sep',
   'okt':'Oct','oktober':'Oct','oct':'Oct',
   'nov':'Nov','november':'Nov',
@@ -173,9 +170,7 @@ const MONTH_MAP = {
 };
 
 function tryParseExcelSerial(serial) {
-  // beberapa sheet bisa mengembalikan number sebagai days since 1899-12-30
-  // konversi sederhana (tanpa memperhitungkan excel 1900-bug) – biasanya bekerja untuk google sheets numeric dates
-  const base = Date.UTC(1899,11,30); // 1899-12-30
+  const base = Date.UTC(1899,11,30);
   const ms = Number(serial) * 24 * 3600 * 1000;
   if (isNaN(ms)) return null;
   const d = new Date(base + ms);
@@ -184,63 +179,42 @@ function tryParseExcelSerial(serial) {
 
 function normalizeAndParseDate(raw) {
   if (!raw && raw !== 0) return null;
+  if (raw instanceof Date) return raw;
 
-  // Jika sudah berupa Date object (rare), gunakan langsung
-  if (raw instanceof Date) {
-    return raw;
-  }
-
-  // Jika raw dari gviz berformat objek dengan 'v'/'f' tersendiri, caller sudah mengirim string/number
   let s = String(raw).trim();
+  s = s.replace(/[-.,]/g, ' '); // replace dash/comma/dot → spasi
 
-  // Handle common pattern "2025-02-21 00:00:00" -> replace space to 'T' for Date.parse
-  if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}$/.test(s)) {
-    const d = new Date(s.replace(' ', 'T'));
-    if (!isNaN(d.getTime())) return d;
-  }
-
-  // If purely numeric, try excel serial conversion
-  if (/^\d+(\.\d+)?$/.test(s)) {
-    const ex = tryParseExcelSerial(Number(s));
-    if (ex) return ex;
-  }
-
-  // Replace localized month words with English abbreviations
-  let lowered = s.toLowerCase();
   for (const k in MONTH_MAP) {
-    const re = new RegExp('\\b' + k + '\\b', 'i');
-    if (re.test(lowered)) {
-      s = s.replace(re, MONTH_MAP[k]);
-      break; // ganti sekali sudah cukup
+    const re = new RegExp('(^|[^a-zA-Z])' + k + '([^a-zA-Z]|$)', 'i');
+    if (re.test(s)) {
+      s = s.replace(re, '$1' + MONTH_MAP[k] + '$2');
     }
   }
 
-  // Replace commas/dots with spaces to help parsing
-  s = s.replace(/[.,]/g, ' ');
-
-  // Try Date.parse (handles many formats like "21 Sep 2025", "Sep 21 2025", "9/21/2025", "21/9/2025" may depend on browser)
+  // try parse standard formats
   let t = Date.parse(s);
   if (!isNaN(t)) return new Date(t);
 
-  // Try common custom regex: dd MMM yyyy
-  const m1 = s.match(/(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})/);
+  // dd MMM yyyy
+  const m1 = s.match(/(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{2,4})/);
   if (m1) {
     const day = parseInt(m1[1],10);
     const monStr = m1[2];
-    const year = parseInt(m1[3],10);
+    let year = parseInt(m1[3],10);
+    if (year < 100) year += 2000;
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     const monIndex = months.findIndex(x => x.toLowerCase() === monStr.toLowerCase());
     if (monIndex >= 0) return new Date(year, monIndex, day);
   }
 
-  // Try reverse: yyyy mm dd
-  const m2 = s.match(/(\d{4})[-\/\s](\d{1,2})[-\/\s](\d{1,2})/);
+  // yyyy mm dd
+  const m2 = s.match(/(\d{4})\s+(\d{1,2})\s+(\d{1,2})/);
   if (m2) {
-    const y = parseInt(m2[1],10), mo = parseInt(m2[2],10)-1, d = parseInt(m2[3],10);
-    return new Date(y, mo, d);
+    return new Date(parseInt(m2[1],10), parseInt(m2[2],10)-1, parseInt(m2[3],10));
   }
 
-  // gagal parse
+  if (/^\d+(\.\d+)?$/.test(s)) return tryParseExcelSerial(Number(s));
+
   return null;
 }
 
@@ -253,18 +227,12 @@ function formatDateShort(d) {
   return `${day} ${mon} ${yr}`;
 }
 
-// mapping status raw -> display + done flag
 function mapStatus(raw) {
-  if (raw === null || raw === undefined || String(raw).trim() === "") {
-    return { display: "-", done: false, raw: raw };
-  }
+  if (raw === null || raw === undefined || String(raw).trim() === "") return { display: "-", done: false, raw };
   const s = String(raw).trim().toLowerCase();
   const okSet = new Set(["v","✔","✓","ok","ya","yes","done","true","terkirim"]);
-  if (okSet.has(s)) return { display: "OK", done: true, raw: raw };
-  // kalau ada kata 'bast' di string -> anggap done
-  if (s.includes("bast") || s.includes("selesai")) return { display: "OK", done: true, raw: raw };
-  // else tampilkan original (uppercase) tapi treat as not done
-  return { display: String(raw).toString(), done: false, raw: raw };
+  if (okSet.has(s) || s.includes("bast") || s.includes("selesai")) return { display: "OK", done: true, raw };
+  return { display: String(raw).toString(), done: false, raw };
 }
 
 fetch(SHEET_URL)
@@ -274,65 +242,44 @@ fetch(SHEET_URL)
       const json = JSON.parse(txt.substr(47).slice(0, -2));
       const rows = json.table.rows || [];
 
-      // Auto-detect start row (index) unless START_ROW dipaksa
       let startIdx = 0;
-      if (START_ROW !== null && !isNaN(Number(START_ROW))) {
-        startIdx = Number(START_ROW);
-      } else {
-        // cari baris pertama yang nampak seperti data:
-        // syarat: punya NoSurat (col 1) OR lembaga (col 2) OR tanggal (col 3)
-        startIdx = 0;
-        for (let i = 0; i < rows.length; i++) {
+      if (START_ROW !== null && !isNaN(Number(START_ROW))) startIdx = Number(START_ROW);
+      else {
+        for (let i=0;i<rows.length;i++){
           const r = rows[i];
-          const hasNo = r.c && r.c[1] && r.c[1].v && String(r.c[1].v).trim() !== "";
-          const hasLemb = r.c && r.c[2] && r.c[2].v && String(r.c[2].v).trim() !== "";
-          const hasTgl = r.c && r.c[3] && ( (r.c[3].f && String(r.c[3].f).trim()!=="") || (r.c[3].v && String(r.c[3].v).trim()!=="") );
-          if (hasNo || hasLemb || hasTgl) { startIdx = i; break; }
+          const hasNo = r.c && r.c[0] && r.c[0].v && String(r.c[0].v).trim() !== "";
+          if (hasNo) { startIdx = i; break; }
         }
       }
 
       const dataRows = rows.slice(startIdx);
+      console.log("total rows:", rows.length, "startIdx:", startIdx, "dataRows:", dataRows.length);
 
-      // Debugging (bisa diliat di console)
-      console.log("total rows from sheet:", rows.length, "startIdx:", startIdx, "dataRows:", dataRows.length);
-      if (dataRows.length > 0) console.log("preview row 0:", dataRows[0]);
-
-      // counters
-      let totalSurat = 0; // dihitung dari tanggal berhasil parse
+      let totalSurat = 0;
       let totalBAST = 0;
-      let onProgress = 0;
       let lembagaSet = new Set();
 
       const tbody = document.querySelector("#tabelSurat tbody");
       tbody.innerHTML = "";
 
-      // iterate dataRows
       dataRows.forEach((r, idx) => {
-        // safe-get helper
-        const getCell = (i) => (r.c && r.c[i] && ('v' in r.c[i] ? r.c[i].v : r.c[i])) ? r.c[i].v : (r.c && r.c[i] && r.c[i]) ? r.c[i] : null;
+        const getCell = (i) => (r.c && r.c[i] && 'v' in r.c[i]) ? r.c[i].v : null;
+        const noSurat = getCell(0) || "";
+        const lembagaRaw = getCell(1) || "";
+        const tglRaw = r.c && r.c[2] ? (r.c[2].f || r.c[2].v) : "";
+        const statusRaw = getCell(8) || "";
 
-        const noSurat = (r.c && r.c[0] && r.c[0].v) ? r.c[0].v : "";     // col A (index 0)
-        const lembagaRaw = (r.c && r.c[1] && r.c[1].v) ? r.c[1].v : "";   // col B (index 1)
-        const tglRaw = (r.c && r.c[2]) ? (r.c[2].f || r.c[2].v) : "";     // col C (index 2)
-        const statusRaw = (r.c && r.c[8] && r.c[8].v) ? r.c[8].v : "";    // col I (index 8)
-
-        // parse tanggal via function yang lebih robust
         const parsedDate = normalizeAndParseDate(tglRaw);
-        const tglDisplay = parsedDate ? formatDateShort(parsedDate) : (String(tglRaw||"").trim() || "");
+        const tglDisplay = parsedDate ? formatDateShort(parsedDate) : String(tglRaw||"").trim();
 
-        // map status
         const mapped = mapStatus(statusRaw);
         const statusDisplay = mapped.display;
         const isDone = mapped.done;
 
-        // counters
-        if (parsedDate) totalSurat++;
+        if (noSurat.trim() !== "") totalSurat++;
         if (isDone) totalBAST++;
-        else onProgress++;
-
         if (lembagaRaw) lembagaSet.add(String(lembagaRaw).trim());
 
-        // build row (noSurat, tgl, lembaga, status)
         const tr = `<tr>
           <td>${escapeHtml(noSurat)}</td>
           <td>${escapeHtml(tglDisplay)}</td>
@@ -346,7 +293,7 @@ fetch(SHEET_URL)
       document.getElementById("totalLembaga").innerText = lembagaSet.size;
       document.getElementById("totalSurat").innerText = totalSurat;
       document.getElementById("totalBAST").innerText = totalBAST;
-      document.getElementById("onProgress").innerText = onProgress;
+      document.getElementById("onProgress").innerText = totalSurat - totalBAST;
 
     } catch (e) {
       console.error("Parse error:", e);
@@ -354,7 +301,6 @@ fetch(SHEET_URL)
   })
   .catch(err => console.error("Error fetch sheet:", err));
 
-// small helper to escape HTML (safety)
 function escapeHtml(s) {
   if (s === null || s === undefined) return "";
   return String(s)
@@ -365,6 +311,7 @@ function escapeHtml(s) {
     .replaceAll("'", "&#39;");
 }
 </script>
+
 
 <style>
 /* Tabel header & striping */
