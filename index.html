@@ -144,6 +144,7 @@
 </div>
 
   
+  
 <!-- ======= SCRIPT & STYLE untuk fetch + parsing ======= -->
 <script>
 // === Konfigurasi Google Sheet ===
@@ -151,9 +152,9 @@ const SHEET_ID = "1fpkO2nodFJNPp71C12LZLxsqsJ8rt9G-wRVSwwugwoc";
 const SHEET_GID = "0";
 const SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}`;
 
-const START_ROW = null; // null -> auto-detect baris pertama yang berisi data
+const START_ROW = null; // auto-detect baris pertama
 
-// Map variasi nama bulan ke format English
+// Map variasi nama bulan lokal ke English
 const MONTH_MAP = {
   'jan':'Jan','januari':'Jan',
   'feb':'Feb','februari':'Feb',
@@ -169,148 +170,110 @@ const MONTH_MAP = {
   'dec':'Dec','desember':'Dec','dec':'Dec'
 };
 
-function tryParseExcelSerial(serial) {
-  const base = Date.UTC(1899,11,30);
-  const ms = Number(serial) * 24 * 3600 * 1000;
-  if (isNaN(ms)) return null;
-  const d = new Date(base + ms);
-  return isNaN(d.getTime()) ? null : d;
-}
-
-function normalizeAndParseDate(raw) {
-  if (!raw && raw !== 0) return null;
-  if (raw instanceof Date) return raw;
-
-  let s = String(raw).trim();
-  s = s.replace(/[-.,]/g, ' '); // replace dash/comma/dot → spasi
-
-  for (const k in MONTH_MAP) {
-    const re = new RegExp('(^|[^a-zA-Z])' + k + '([^a-zA-Z]|$)', 'i');
-    if (re.test(s)) {
-      s = s.replace(re, '$1' + MONTH_MAP[k] + '$2');
-    }
+// Parsing tanggal sederhana tapi fleksibel
+function normalizeAndParseDate(raw){
+  if(!raw && raw!==0) return null;
+  let s = String(raw).trim().replace(/[-.,]/g,' ');
+  for(const k in MONTH_MAP){
+    const re = new RegExp('(^|[^a-zA-Z])'+k+'([^a-zA-Z]|$)','i');
+    s = s.replace(re,'$1'+MONTH_MAP[k]+'$2');
   }
-
-  // try parse standard formats
   let t = Date.parse(s);
-  if (!isNaN(t)) return new Date(t);
+  if(!isNaN(t)) return new Date(t);
 
-  // dd MMM yyyy
-  const m1 = s.match(/(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{2,4})/);
-  if (m1) {
-    const day = parseInt(m1[1],10);
-    const monStr = m1[2];
-    let year = parseInt(m1[3],10);
-    if (year < 100) year += 2000;
+  // dd MMM yy / yyyy
+  const m = s.match(/(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{2,4})/);
+  if(m){
+    const day = parseInt(m[1],10);
+    const monStr = m[2];
+    let year = parseInt(m[3],10);
+    if(year<100) year+=2000;
     const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    const monIndex = months.findIndex(x => x.toLowerCase() === monStr.toLowerCase());
-    if (monIndex >= 0) return new Date(year, monIndex, day);
+    const monIndex = months.findIndex(x=>x.toLowerCase()===monStr.toLowerCase());
+    if(monIndex>=0) return new Date(year,monIndex,day);
   }
-
-  // yyyy mm dd
-  const m2 = s.match(/(\d{4})\s+(\d{1,2})\s+(\d{1,2})/);
-  if (m2) {
-    return new Date(parseInt(m2[1],10), parseInt(m2[2],10)-1, parseInt(m2[3],10));
-  }
-
-  if (/^\d+(\.\d+)?$/.test(s)) return tryParseExcelSerial(Number(s));
-
   return null;
 }
 
-function formatDateShort(d) {
-  if (!d) return "";
+function formatDateShort(d){
+  if(!d) return "";
   const day = String(d.getDate()).padStart(2,'0');
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-  const mon = months[d.getMonth()];
-  const yr = d.getFullYear();
-  return `${day} ${mon} ${yr}`;
+  return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-function mapStatus(raw) {
-  if (raw === null || raw === undefined || String(raw).trim() === "") return { display: "-", done: false, raw };
+function mapStatus(raw){
+  if(!raw || String(raw).trim()==="") return {display:"-",done:false};
   const s = String(raw).trim().toLowerCase();
   const okSet = new Set(["v","✔","✓","ok","ya","yes","done","true","terkirim"]);
-  if (okSet.has(s) || s.includes("bast") || s.includes("selesai")) return { display: "OK", done: true, raw };
-  return { display: String(raw).toString(), done: false, raw };
+  if(okSet.has(s) || s.includes("bast") || s.includes("selesai")) return {display:"OK",done:true};
+  return {display:String(raw),done:false};
 }
 
-fetch(SHEET_URL)
-  .then(res => res.text())
-  .then(txt => {
-    try {
-      const json = JSON.parse(txt.substr(47).slice(0, -2));
-      const rows = json.table.rows || [];
+// helper safe-get
+const getCellValue = cell => {
+  if(!cell) return "";
+  return ('v' in cell && cell.v!=null)?cell.v:(cell.f||"");
+};
 
+fetch(SHEET_URL)
+  .then(res=>res.text())
+  .then(txt=>{
+    try{
+      const json = JSON.parse(txt.substr(47).slice(0,-2));
+      const rows = json.table.rows||[];
       let startIdx = 0;
-      if (START_ROW !== null && !isNaN(Number(START_ROW))) startIdx = Number(START_ROW);
+      if(START_ROW!==null) startIdx = START_ROW;
       else {
-        for (let i=0;i<rows.length;i++){
+        for(let i=0;i<rows.length;i++){
           const r = rows[i];
-          const hasNo = r.c && r.c[0] && r.c[0].v && String(r.c[0].v).trim() !== "";
-          if (hasNo) { startIdx = i; break; }
+          const no = getCellValue(r.c[0]);
+          if(no.trim()!==""){startIdx=i;break;}
         }
       }
 
       const dataRows = rows.slice(startIdx);
-      console.log("total rows:", rows.length, "startIdx:", startIdx, "dataRows:", dataRows.length);
+      const tbody = document.querySelector("#tabelSurat tbody");
+      tbody.innerHTML="";
 
-      let totalSurat = 0;
-      let totalBAST = 0;
+      let totalSurat=0;
+      let totalBAST=0;
       let lembagaSet = new Set();
 
-      const tbody = document.querySelector("#tabelSurat tbody");
-      tbody.innerHTML = "";
-
-      dataRows.forEach((r, idx) => {
-        const getCell = (i) => (r.c && r.c[i] && 'v' in r.c[i]) ? r.c[i].v : null;
-        const noSurat = getCell(0) || "";
-        const lembagaRaw = getCell(1) || "";
-        const tglRaw = r.c && r.c[2] ? (r.c[2].f || r.c[2].v) : "";
-        const statusRaw = getCell(8) || "";
+      dataRows.forEach(r=>{
+        const noSurat = getCellValue(r.c[0]);
+        const lembagaRaw = getCellValue(r.c[1]);
+        const tglRaw = getCellValue(r.c[2]);
+        const statusRaw = getCellValue(r.c[8]);
 
         const parsedDate = normalizeAndParseDate(tglRaw);
-        const tglDisplay = parsedDate ? formatDateShort(parsedDate) : String(tglRaw||"").trim();
+        const tglDisplay = parsedDate?formatDateShort(parsedDate):String(tglRaw||"").trim();
 
         const mapped = mapStatus(statusRaw);
-        const statusDisplay = mapped.display;
-        const isDone = mapped.done;
 
-        if (noSurat.trim() !== "") totalSurat++;
-        if (isDone) totalBAST++;
-        if (lembagaRaw) lembagaSet.add(String(lembagaRaw).trim());
+        if(noSurat.trim()!=="") totalSurat++;
+        if(mapped.done) totalBAST++;
+        if(lembagaRaw) lembagaSet.add(lembagaRaw.trim());
 
         const tr = `<tr>
-          <td>${escapeHtml(noSurat)}</td>
-          <td>${escapeHtml(tglDisplay)}</td>
-          <td>${escapeHtml(lembagaRaw)}</td>
-          <td>${escapeHtml(statusDisplay)}</td>
+          <td>${noSurat}</td>
+          <td>${tglDisplay}</td>
+          <td>${lembagaRaw}</td>
+          <td>${mapped.display}</td>
         </tr>`;
-        tbody.insertAdjacentHTML('beforeend', tr);
+        tbody.insertAdjacentHTML('beforeend',tr);
       });
 
-      // update scorecards
       document.getElementById("totalLembaga").innerText = lembagaSet.size;
       document.getElementById("totalSurat").innerText = totalSurat;
       document.getElementById("totalBAST").innerText = totalBAST;
       document.getElementById("onProgress").innerText = totalSurat - totalBAST;
 
-    } catch (e) {
-      console.error("Parse error:", e);
-    }
+    }catch(e){console.error(e);}
   })
-  .catch(err => console.error("Error fetch sheet:", err));
-
-function escapeHtml(s) {
-  if (s === null || s === undefined) return "";
-  return String(s)
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'", "&#39;");
-}
+  .catch(err=>console.error(err));
 </script>
+
 
 
 <style>
