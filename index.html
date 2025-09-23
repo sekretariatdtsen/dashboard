@@ -310,10 +310,10 @@ fetch(SHEET_URL)
         // safe-get helper
         const getCell = (i) => (r.c && r.c[i] && ('v' in r.c[i] ? r.c[i].v : r.c[i])) ? r.c[i].v : (r.c && r.c[i] && r.c[i]) ? r.c[i] : null;
 
-        const noSurat = (r.c && r.c[1] && r.c[1].v) ? r.c[1].v : "";     // col B (index 1)
-        const lembagaRaw = (r.c && r.c[2] && r.c[2].v) ? r.c[2].v : "";   // col C (index 2)
-        const tglRaw = (r.c && r.c[3]) ? (r.c[3].f || r.c[3].v) : "";     // col D (index 3)
-        const statusRaw = (r.c && r.c[9] && r.c[9].v) ? r.c[9].v : "";    // col J (index 9)
+        const noSurat = (r.c && r.c[0] && r.c[0].v) ? r.c[0].v : "";     // col B (index 1)
+        const lembagaRaw = (r.c && r.c[1] && r.c[1].v) ? r.c[1].v : "";   // col C (index 2)
+        const tglRaw = (r.c && r.c[2]) ? (r.c[2].f || r.c[2].v) : "";     // col D (index 3)
+        const statusRaw = (r.c && r.c[8] && r.c[8].v) ? r.c[8].v : "";    // col J (index 9)
 
         // parse tanggal via function yang lebih robust
         const parsedDate = normalizeAndParseDate(tglRaw);
