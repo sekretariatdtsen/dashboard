@@ -164,7 +164,7 @@ const MONTH_MAP = {
   'mei':'May','may':'May',
   'jun':'Jun','juni':'Jun',
   'jul':'Jul','juli':'Jul',
-  'aug':'Aug','agust':'Aug','agustus':'Aug','agu':'Aug',
+  'aug':'Aug','agust':'Aug','Agust':'Aug','agu':'Aug',
   'sep':'Sep','sept':'Sep','september':'Sep',
   'okt':'Oct','oktober':'Oct','oct':'Oct',
   'nov':'Nov','november':'Nov',
@@ -324,10 +324,15 @@ fetch(SHEET_URL)
         const statusDisplay = mapped.display;
         const isDone = mapped.done;
 
-        // counters
-        if (parsedDate) totalSurat++;
-        if (isDone) totalBAST++;
-        else onProgress++;
+        // Hitung Jumlah Surat = ada isian di kolom Lembaga
+        if (lembaga) totalSurat++;
+
+        // Hitung BAST Selesai / On Progress
+        if (statusRaw === "v") {
+          totalBAST++;
+        } else if (!statusRaw || statusRaw === "") {
+          onProgress++;
+        }
 
         if (lembagaRaw) lembagaSet.add(String(lembagaRaw).trim());
 
