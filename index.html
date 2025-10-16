@@ -261,9 +261,9 @@ function mapStatus(raw) {
   }
   const s = String(raw).trim().toLowerCase();
   const okSet = new Set(["v","✔","✓","ok","ya","yes","done","true","terkirim"]);
-  if (okSet.has(s)) return { display: "OK", done: true, raw: raw };
+  if (okSet.has(s)) return { display: "✅", done: true, raw: raw };
   // kalau ada kata 'bast' di string -> anggap done
-  if (s.includes("bast") || s.includes("selesai")) return { display: "OK", done: true, raw: raw };
+  if (s.includes("bast") || s.includes("selesai")) return { display: "✅", done: true, raw: raw };
   // else tampilkan original (uppercase) tapi treat as not done
   return { display: String(raw).toString(), done: false, raw: raw };
 }
@@ -315,7 +315,7 @@ fetch(SHEET_URL)
         const noSurat = (r.c && r.c[0] && r.c[0].v) ? r.c[0].v : "";     // col A (index 0)
         const lembagaRaw = (r.c && r.c[1] && r.c[1].v) ? r.c[1].v : "";   // col B (index 1)
         const tglRaw = (r.c && r.c[2]) ? (r.c[2].f || r.c[2].v) : "";     // col C (index 2)
-        const statusRaw = (r.c && r.c[8] && r.c[8].v) ? r.c[8].v : "";    // col I (index 8)
+        const statusRaw = (r.c && r.c[5] && r.c[5].v) ? r.c[5].v : "";    // col F (index 5)
 
         // parse tanggal via function yang lebih robust
         const parsedDate = normalizeAndParseDate(tglRaw);
