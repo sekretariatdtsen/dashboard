@@ -260,7 +260,7 @@ function mapStatus(raw) {
     return { display: "-", done: false, raw: raw };
   }
   const s = String(raw).trim().toLowerCase();
-  const okSet = new Set(["v","✔","✓","ok","ya","yes","done","true","terkirim"]);
+  const okSet = new Set(["✅","v","✔","✓","ok","ya","yes","done","true","terkirim"]);
   if (okSet.has(s)) return { display: "✅", done: true, raw: raw };
   // kalau ada kata 'bast' di string -> anggap done
   if (s.includes("bast") || s.includes("selesai")) return { display: "✅", done: true, raw: raw };
