@@ -310,7 +310,7 @@ fetch(SHEET_URL)
       // iterate dataRows
       dataRows.forEach((r, idx) => {
         // safe-get helper
-        const getCell = (i) => (r.c && r.c[i] && ('v' in r.c[i] ? r.c[i].v : r.c[i])) ? r.c[i].v : (r.c && r.c[i] && r.c[i]) ? r.c[i] : null;
+        const getCell = (i) => (r.c && r.c[i] && ('✅' in r.c[i] ? r.c[i].v : r.c[i])) ? r.c[i].v : (r.c && r.c[i] && r.c[i]) ? r.c[i] : null;
 
         const noSurat = (r.c && r.c[0] && r.c[0].v) ? r.c[0].v : "";     // col A (index 0)
         const lembagaRaw = (r.c && r.c[1] && r.c[1].v) ? r.c[1].v : "";   // col B (index 1)
